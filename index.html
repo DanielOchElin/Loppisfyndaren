@@ -238,7 +238,7 @@
   <div class="topbar">
     <div class="topbar-logo">
       <span class="name">Loppis<span>fyndaren</span></span>
-      <span class="ver">v3.0</span>
+      <span class="ver">v3.1</span>
     </div>
     <button class="icon-btn" onclick="openSettings()">⚙️</button>
   </div>
@@ -448,6 +448,26 @@ function takePhoto() {
   inp.onchange = handlePhotoUpload; inp.click();
 }
 
+// Compress to max 1568px JPEG 0.7 — matches Anthropic's internal limit, keeps quality identical
+function compressImage(dataUrl) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1568;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', 0.7));
+    };
+    img.src = dataUrl;
+  });
+}
+
 function handlePhotoUpload(ev) {
   const files = Array.from(ev.target.files).slice(0, 10);
   if (!files.length) return;
@@ -455,11 +475,10 @@ function handlePhotoUpload(ev) {
 
   files.forEach(file => {
     const reader = new FileReader();
-    reader.onload = e => {
-      const dataUrl = e.target.result;
-      const mime = dataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
-      S.photos.push({ dataUrl, mime, name: file.name });
-      addThumbToStrip(dataUrl, S.photos.length - 1);
+    reader.onload = async e => {
+      const compressed = await compressImage(e.target.result);
+      S.photos.push({ dataUrl: compressed, mime: 'image/jpeg', name: file.name });
+      addThumbToStrip(compressed, S.photos.length - 1);
       updatePhotoUI();
     };
     reader.readAsDataURL(file);
@@ -719,10 +738,11 @@ function takeDeepPhoto() {
 function addDeepPhotos(ev) {
   Array.from(ev.target.files).forEach(file => {
     const r = new FileReader();
-    r.onload = e => {
-      S.deepPhotos.push({ dataUrl: e.target.result, mime: e.target.result.split(';')[0].split(':')[1] || 'image/jpeg' });
+    r.onload = async e => {
+      const compressed = await compressImage(e.target.result);
+      S.deepPhotos.push({ dataUrl: compressed, mime: 'image/jpeg' });
       const g = document.getElementById('deep-photos-grid');
-      const img = document.createElement('img'); img.className = 'photo-thumb'; img.src = e.target.result;
+      const img = document.createElement('img'); img.className = 'photo-thumb'; img.src = compressed;
       g.insertBefore(img, g.lastElementChild);
       document.getElementById('deep-analyze-btn').disabled = false;
     };
