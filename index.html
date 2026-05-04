@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Loppisfyndaren</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface2: #1e1e1e;
+    --border: #2a2a2a;
+    --accent: #f59e0b;
+    --accent-dim: rgba(245,158,11,0.12);
+    --accent-glow: rgba(245,158,11,0.35);
+    --text: #f0ece3;
+    --text2: #7a7570;
+    --text3: #4a4540;
+    --green: #4ade80;
+    --red: #f87171;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; height: 100%; overflow: hidden; -webkit-font-smoothing: antialiased; }
+  .screen { position: fixed; inset: 0; display: flex; flex-direction: column; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; overflow: hidden; }
+  .screen.active { opacity: 1; pointer-events: all; }
+  .mono { font-family: 'DM Mono', monospace; }
+
+  /* TOPBAR */
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; padding-top: max(14px, env(safe-area-inset-top)); background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; z-index: 10; }
+  .topbar-logo { font-size: 19px; font-weight: 800; letter-spacing: -0.02em; }
+  .topbar-logo span { color: var(--accent); }
+  .topbar-title { font-size: 16px; font-weight: 700; }
+  .icon-btn { width: 36px; height: 36px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); color: var(--text); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; transition: background 0.15s; }
+  .icon-btn:active { background: var(--surface2); }
+
+  /* BUTTONS */
+  .btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 15px 22px; border-radius: var(--radius); font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; border: none; transition: all 0.15s; letter-spacing: 0.01em; text-decoration: none; }
+  .btn-primary { background: var(--accent); color: #0a0a0a; }
+  .btn-primary:active { filter: brightness(0.88); transform: scale(0.98); }
+  .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:active { background: var(--surface2); }
+  .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .btn-ghost:active { background: var(--accent-dim); }
+  .btn-full { width: 100%; }
+  .btn:disabled { opacity: 0.35; pointer-events: none; }
+
+  /* INPUTS */
+  .input-group { display: flex; flex-direction: column; gap: 7px; }
+  .input-label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.08em; text-transform: uppercase; }
+  .input { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 13px 15px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 14px; width: 100%; outline: none; transition: border-color 0.2s; }
+  .input:focus { border-color: var(--accent); }
+
+  /* SCROLL */
+  .scroll-content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 18px; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+
+  /* API KEY */
+  #screen-apikey { justify-content: center; padding: 40px 26px; padding-top: max(40px, env(safe-area-inset-top)); gap: 30px; }
+  .apikey-logo { text-align: center; }
+  .logo-icon { font-size: 52px; display: block; margin-bottom: 10px; filter: drop-shadow(0 0 18px var(--accent-glow)); }
+  .apikey-logo h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; }
+  .apikey-logo h1 span { color: var(--accent); }
+  .apikey-logo p { margin-top: 7px; font-size: 13px; color: var(--text2); }
+  .apikey-form { display: flex; flex-direction: column; gap: 18px; }
+  .apikey-note { text-align: center; font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; line-height: 1.6; }
+
+  /* HOME */
+  #screen-home { background: var(--bg); }
+  #screen-home .scroll-content { display: flex; flex-direction: column; gap: 18px; }
+  .mode-tabs { display: flex; background: var(--surface); border-radius: var(--radius); padding: 4px; gap: 3px; }
+  .mode-tab { flex: 1; padding: 10px 8px; border-radius: 12px; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--text2); border: none; background: transparent; transition: all 0.2s; text-align: center; }
+  .mode-tab.active { background: var(--accent); color: #0a0a0a; }
+
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; align-items: center; gap: 10px; position: relative; overflow: hidden; background: var(--surface); }
+  .upload-zone input { display: none; }
+  .upload-icon { font-size: 44px; filter: drop-shadow(0 0 10px var(--accent-glow)); }
+  .upload-title { font-size: 17px; font-weight: 700; }
+  .upload-sub { font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace; }
+  .upload-zone.loaded { border-color: var(--accent); padding: 14px; }
+  .upload-zone.loaded .upload-placeholder { display: none; }
+
+  #video-preview-wrap { display: none; flex-direction: column; gap: 9px; width: 100%; }
+  .upload-zone.loaded #video-preview-wrap { display: flex; }
+  #video-preview { width: 100%; border-radius: var(--radius-sm); background: #000; max-height: 200px; object-fit: contain; }
+  .media-info { display: flex; justify-content: space-between; align-items: center; }
+  .media-name { font-size: 12px; color: var(--accent); font-family: 'DM Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+  .media-change { font-size: 12px; color: var(--text2); text-decoration: underline; cursor: pointer; flex-shrink: 0; }
+
+  .photo-grid-scroll { display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+  .photo-grid-scroll::-webkit-scrollbar { display: none; }
+  .photo-thumb-home { width: 80px; height: 80px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; border: 2px solid var(--border); }
+
+  .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .settings-label { font-size: 13px; color: var(--text2); flex-shrink: 0; }
+  .seg-control { display: flex; background: var(--bg); border-radius: var(--radius-sm); padding: 3px; gap: 2px; }
+  .seg-btn { padding: 5px 11px; border-radius: 7px; font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer; color: var(--text2); border: none; background: transparent; transition: all 0.15s; }
+  .seg-btn.active { background: var(--accent); color: #0a0a0a; font-weight: 500; }
+
+  /* SCANNING */
+  #screen-scanning { background: var(--bg); }
+  .scan-video-wrap { position: relative; background: #000; flex-shrink: 0; }
+  #scan-video { width: 100%; max-height: 240px; display: block; object-fit: contain; background: #000; }
+  .scan-overlay { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(transparent, rgba(0,0,0,0.85)); padding: 10px 14px; display: flex; align-items: center; gap: 8px; }
+  .scan-time { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text); flex-shrink: 0; }
+  .scan-progress-bar { flex: 1; height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; }
+  .scan-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.5s linear; width: 0%; }
+  .scan-status { padding: 10px 18px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+  .scan-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:0.4; transform:scale(0.75); } }
+  .scan-dot.idle { background: var(--text3); animation: none; }
+  .scan-dot.done { background: var(--green); animation: none; }
+  .scan-dot.error { background: var(--red); animation: none; }
+  .scan-status-text { font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scan-count { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent); font-weight: 500; flex-shrink: 0; }
+  .scan-controls { display: flex; gap: 9px; padding: 10px 16px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
+  .scan-controls .btn { flex: 1; padding: 11px 12px; font-size: 13px; }
+  .findings-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 14px; padding-bottom: max(24px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 9px; }
+  .findings-header { font-size: 10px; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; padding: 3px 0 6px; }
+
+  /* FINDING CARD */
+  .finding-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; animation: slideIn 0.3s ease; }
+  @keyframes slideIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  .finding-card:active { transform: scale(0.98); border-color: var(--accent); }
+  .finding-image-wrap { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden; }
+  .finding-image-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .finding-canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; pointer-events: none; }
+  .finding-badge { position: absolute; top: 7px; right: 7px; background: rgba(0,0,0,0.65); border-radius: 20px; padding: 2px 9px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--accent); backdrop-filter: blur(4px); }
+  .finding-body { padding: 11px 13px; display: flex; align-items: center; gap: 9px; }
+  .finding-info { flex: 1; min-width: 0; }
+  .finding-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .finding-meta { display: flex; align-items: center; gap: 7px; margin-top: 2px; }
+  .finding-price { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--accent); font-weight: 500; }
+  .confidence-dots { display: flex; gap: 3px; }
+  .confidence-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--border); }
+  .confidence-dot.filled { background: var(--accent); }
+  .finding-arrow { color: var(--text3); font-size: 18px; flex-shrink: 0; }
+
+  /* EMPTY / ERROR */
+  .empty-state { text-align: center; padding: 36px 18px; color: var(--text3); }
+  .empty-icon { font-size: 32px; margin-bottom: 10px; opacity: 0.4; }
+  .empty-text { font-size: 13px; font-family: 'DM Mono', monospace; }
+  .error-card { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); border-radius: var(--radius-sm); padding: 11px 13px; font-size: 12px; color: var(--red); font-family: 'DM Mono', monospace; line-height: 1.5; display: none; }
+  .error-card.visible { display: block; }
+
+  /* PHOTO SCAN PROGRESS */
+  #screen-photo-scan { background: var(--bg); }
+  .photo-analyze-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 13px; display: flex; align-items: center; gap: 10px; font-size: 12px; font-family: 'DM Mono', monospace; color: var(--text2); }
+  .photo-analyze-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+  .photo-analyze-status { flex: 1; }
+  .photo-analyze-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--accent-dim); color: var(--accent); flex-shrink: 0; }
+  .photo-analyze-badge.done { background: rgba(74,222,128,0.1); color: var(--green); }
+  .photo-analyze-badge.err { background: rgba(248,113,113,0.1); color: var(--red); }
+
+  /* RESULTS */
+  #screen-results { background: var(--bg); }
+  .results-summary { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 13px 15px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .results-summary-label { font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace; }
+  .results-summary-val { font-size: 20px; font-weight: 800; color: var(--accent); }
+
+  /* DETAIL */
+  #screen-detail { background: var(--bg); }
+  #screen-detail .scroll-content { display: flex; flex-direction: column; gap: 0; padding: 0; }
+  .detail-image-wrap { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden; flex-shrink: 0; }
+  .detail-image-wrap img { width: 100%; height: 100%; object-fit: cover; }
+  .detail-canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; pointer-events: none; }
+  .detail-body { padding: 18px; display: flex; flex-direction: column; gap: 18px; }
+  .detail-name { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
+  .detail-sub { font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace; margin-top: 4px; }
+  .detail-price-row { display: flex; align-items: center; gap: 10px; padding: 14px; background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); }
+  .detail-price { font-size: 30px; font-weight: 800; color: var(--accent); letter-spacing: -0.03em; }
+  .detail-price-label { font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace; margin-top: 2px; }
+  .detail-confidence { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+  .detail-confidence-pct { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--accent); }
+  .detail-confidence-label { font-size: 10px; color: var(--text3); }
+  .detail-section { display: flex; flex-direction: column; gap: 9px; }
+  .detail-section-title { font-size: 10px; font-weight: 600; color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase; }
+  .detail-desc { font-size: 13px; color: var(--text2); line-height: 1.6; font-family: 'DM Mono', monospace; }
+  .photo-instructions { display: flex; flex-direction: column; gap: 7px; }
+  .photo-instruction { display: flex; align-items: flex-start; gap: 9px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 13px; }
+  .photo-instruction-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+  .photo-instruction-text { font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace; line-height: 1.5; }
+  .links-row { display: flex; gap: 9px; }
+  .link-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 11px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); text-decoration: none; font-size: 13px; font-weight: 600; transition: all 0.15s; }
+  .link-btn:active { border-color: var(--accent); color: var(--accent); }
+  .detail-footer { padding: 14px 18px; padding-bottom: max(22px, env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
+
+  /* DEEP DIVE */
+  #screen-deep { background: var(--bg); }
+  #screen-deep .scroll-content { display: flex; flex-direction: column; gap: 16px; }
+  .photos-grid { display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+  .photos-grid::-webkit-scrollbar { display: none; }
+  .photo-thumb { width: 84px; height: 84px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; border: 2px solid var(--border); }
+  .photo-add { width: 84px; height: 84px; border-radius: var(--radius-sm); border: 2px dashed var(--border); flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer; font-size: 20px; color: var(--text3); transition: all 0.15s; }
+  .photo-add:active { border-color: var(--accent); color: var(--accent); }
+  .photo-add-label { font-size: 9px; color: var(--text3); font-family: 'DM Mono', monospace; }
+  .loading-overlay { display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; padding: 40px; text-align: center; }
+  .loading-overlay.visible { display: flex; }
+  .loading-spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 13px; color: var(--text2); font-family: 'DM Mono', monospace; }
+  .deep-result { display: none; flex-direction: column; gap: 14px; }
+  .deep-result.visible { display: flex; }
+  .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 9px; }
+  .result-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .result-key { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.06em; flex-shrink: 0; padding-top: 2px; }
+  .result-val { font-size: 13px; color: var(--text); font-weight: 600; text-align: right; flex: 1; }
+  .result-val.accent { color: var(--accent); font-size: 17px; }
+
+  /* SETTINGS MODAL */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(4px); z-index: 100; display: none; align-items: flex-end; }
+  .modal-backdrop.open { display: flex; }
+  .modal-sheet { width: 100%; background: var(--surface); border-radius: var(--radius) var(--radius) 0 0; padding: 22px 18px; padding-bottom: max(22px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 18px; animation: slideUp 0.3s ease; }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-handle { width: 34px; height: 4px; background: var(--border); border-radius: 2px; margin: -6px auto 2px; }
+  .modal-title { font-size: 17px; font-weight: 700; }
+  .divider-line { border: none; border-top: 1px solid var(--border); }
+
+  /* TOAST */
+  #toast { position: fixed; bottom: max(90px, calc(env(safe-area-inset-bottom) + 80px)); left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 9px 16px; font-size: 12px; font-family: 'DM Mono', monospace; color: var(--text); white-space: nowrap; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- API KEY -->
+<div id="screen-apikey" class="screen active">
+  <div class="apikey-logo">
+    <span class="logo-icon">🔍</span>
+    <h1>Loppis<span>fyndaren</span></h1>
+    <p>AI-driven värdebedömning på sekunder</p>
+  </div>
+  <div class="apikey-form">
+    <div class="input-group">
+      <label class="input-label">Anthropic API-nyckel</label>
+      <input type="password" class="input" id="apikey-input" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false">
+    </div>
+    <div id="apikey-error" class="error-card"></div>
+    <button class="btn btn-primary btn-full" onclick="saveApiKey()">Spara och fortsätt →</button>
+  </div>
+  <p class="apikey-note">Nyckeln sparas lokalt i din webbläsare.<br>Den skickas aldrig till någon annan server.</p>
+</div>
+
+<!-- HOME -->
+<div id="screen-home" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">Loppis<span>fyndaren</span> <span style="font-size:11px;font-weight:500;color:var(--text3);letter-spacing:0.05em;font-family:'DM Mono',monospace;">v2.1</span></div>
+    <button class="icon-btn" onclick="openSettings()">⚙️</button>
+  </div>
+  <div class="scroll-content">
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="tab-video" onclick="setMode('video')">📹 Video</button>
+      <button class="mode-tab" id="tab-photo" onclick="setMode('photo')">🖼 Stillbilder</button>
+    </div>
+
+    <!-- VIDEO -->
+    <div id="video-home-wrap" style="display:flex;flex-direction:column;gap:16px;">
+      <div class="upload-zone" id="upload-zone" onclick="triggerVideoUpload()">
+        <input type="file" id="video-input" accept="video/*" onchange="handleVideoUpload(event)">
+        <div class="upload-placeholder">
+          <div class="upload-icon">📹</div>
+          <div class="upload-title">Ladda upp video</div>
+          <div class="upload-sub">Filma ett svep över bordet eller hyllan</div>
+        </div>
+        <div id="video-preview-wrap">
+          <video id="video-preview" muted playsinline></video>
+          <div class="media-info">
+            <span class="media-name" id="video-name-label">video.mp4</span>
+            <span class="media-change" onclick="changeVideo(event)">Byt</span>
+          </div>
+        </div>
+      </div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <span class="settings-label">Scan-intervall</span>
+          <div class="seg-control">
+            <button class="seg-btn active" data-interval="1" onclick="setInterval_(this)">1s</button>
+            <button class="seg-btn" data-interval="3" onclick="setInterval_(this)">3s</button>
+            <button class="seg-btn" data-interval="5" onclick="setInterval_(this)">5s</button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span class="settings-label">Min. värde</span>
+          <div class="seg-control">
+            <button class="seg-btn active" data-minval="0" onclick="setMinVal(this)">Alla</button>
+            <button class="seg-btn" data-minval="100" onclick="setMinVal(this)">100kr+</button>
+            <button class="seg-btn" data-minval="500" onclick="setMinVal(this)">500kr+</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" id="start-scan-btn" onclick="startVideoScan()" disabled>🔍 Starta video-scan</button>
+      <div id="home-video-error" class="error-card"></div>
+    </div>
+
+    <!-- PHOTO -->
+    <div id="photo-home-wrap" style="display:none;flex-direction:column;gap:16px;">
+      <div class="upload-zone" onclick="document.getElementById('photo-input').click()" style="padding:32px 20px;">
+        <input type="file" id="photo-input" accept="image/*" multiple onchange="handlePhotoUpload(event)">
+        <div class="upload-icon">🖼</div>
+        <div class="upload-title">Ladda upp foton</div>
+        <div class="upload-sub">Välj 1–10 bilder från loppis</div>
+      </div>
+      <div id="photo-preview-section" style="display:none;flex-direction:column;gap:10px;">
+        <div class="photo-grid-scroll" id="photo-grid-home"></div>
+        <div class="media-info">
+          <span class="media-name" id="photo-count-label">0 foton</span>
+          <span class="media-change" onclick="clearPhotos()">Rensa</span>
+        </div>
+      </div>
+      <div class="settings-card">
+        <div class="settings-row">
+          <span class="settings-label">Min. värde</span>
+          <div class="seg-control">
+            <button class="seg-btn active" data-minval2="0" onclick="setMinVal2(this)">Alla</button>
+            <button class="seg-btn" data-minval2="100" onclick="setMinVal2(this)">100kr+</button>
+            <button class="seg-btn" data-minval2="500" onclick="setMinVal2(this)">500kr+</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-full" id="start-photo-btn" onclick="startPhotoScan()" disabled>🔍 Analysera foton</button>
+      <div id="home-photo-error" class="error-card"></div>
+    </div>
+  </div>
+</div>
+
+<!-- VIDEO SCANNING -->
+<div id="screen-scanning" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" onclick="stopScan()">✕</button>
+    <div class="topbar-title">Scanning…</div>
+    <div style="width:36px"></div>
+  </div>
+  <div class="scan-video-wrap">
+    <video id="scan-video" muted playsinline></video>
+    <div class="scan-overlay">
+      <span class="scan-time mono" id="scan-time">0:00</span>
+      <div class="scan-progress-bar"><div class="scan-progress-fill" id="scan-progress"></div></div>
+    </div>
+  </div>
+  <div class="scan-status">
+    <div class="scan-dot" id="scan-dot"></div>
+    <span class="scan-status-text" id="scan-status-text">Startar…</span>
+    <span class="scan-count" id="scan-count"></span>
+  </div>
+  <div class="scan-controls">
+    <button class="btn btn-secondary" id="pause-btn" onclick="togglePause()">⏸ Pausa</button>
+    <button class="btn btn-ghost" onclick="analyzeNow()">📸 Analysera nu</button>
+  </div>
+  <div class="findings-list" id="scan-findings">
+    <div class="findings-header">Fynd hittills</div>
+    <div class="empty-state" id="scan-empty">
+      <div class="empty-icon">👀</div>
+      <div class="empty-text">Letar efter föremål…</div>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO SCAN PROGRESS -->
+<div id="screen-photo-scan" class="screen">
+  <div class="topbar">
+    <div style="width:36px"></div>
+    <div class="topbar-title">Analyserar foton</div>
+    <div style="width:36px"></div>
+  </div>
+  <div class="scroll-content" style="display:flex;flex-direction:column;gap:10px;">
+    <div style="font-size:13px;color:var(--text2);font-family:'DM Mono',monospace;line-height:1.7;">
+      Analyserar bild för bild. Tar någon minut.
+    </div>
+    <div id="photo-scan-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div id="photo-scan-error" class="error-card"></div>
+  </div>
+</div>
+
+<!-- RESULTS -->
+<div id="screen-results" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" onclick="showScreen('home')">◀</button>
+    <div class="topbar-title" id="results-title">Fynd</div>
+    <button class="icon-btn" onclick="showScreen('home')">🔄</button>
+  </div>
+  <div class="scroll-content">
+    <div class="results-summary">
+      <span class="results-summary-label">Totalt estimerat värde</span>
+      <span class="results-summary-val" id="results-total">0 kr</span>
+    </div>
+    <div id="results-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+</div>
+
+<!-- DETAIL -->
+<div id="screen-detail" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" onclick="goBackFromDetail()">◀</button>
+    <div class="topbar-title" id="detail-topbar-title">Detaljer</div>
+    <div style="width:36px"></div>
+  </div>
+  <div class="scroll-content" id="detail-content"></div>
+  <div class="detail-footer">
+    <button class="btn btn-primary btn-full" onclick="goToDeepDive()">📸 Fota närmre — djupanalys →</button>
+  </div>
+</div>
+
+<!-- DEEP DIVE -->
+<div id="screen-deep" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" onclick="showScreen('detail')">◀</button>
+    <div class="topbar-title">Djupanalys</div>
+    <div style="width:36px"></div>
+  </div>
+  <div class="scroll-content">
+    <div style="font-size:13px;color:var(--text2);font-family:'DM Mono',monospace;line-height:1.6;" id="deep-instructions-text">
+      Ladda upp närbild(er). Fota etikett, märkning, detaljer och baksida.
+    </div>
+    <div class="input-group">
+      <label class="input-label">Foton</label>
+      <div class="photos-grid" id="deep-photos-grid">
+        <div class="photo-add" onclick="document.getElementById('deep-file-input').click()">
+          <span>＋</span><span class="photo-add-label">Lägg till</span>
+        </div>
+      </div>
+      <input type="file" id="deep-file-input" accept="image/*" multiple style="display:none" onchange="addDeepPhotos(event)">
+    </div>
+    <button class="btn btn-secondary btn-full" onclick="takePhoto()">📷 Ta foto direkt med kameran</button>
+    <button class="btn btn-primary btn-full" id="deep-analyze-btn" onclick="runDeepAnalysis()" disabled>🔍 Analysera →</button>
+    <div id="deep-error" class="error-card"></div>
+    <div class="loading-overlay" id="deep-loading">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">Djupanalys pågår…</div>
+    </div>
+    <div class="deep-result" id="deep-result">
+      <div class="detail-section-title">Djupanalys</div>
+      <div class="result-card" id="deep-result-card"></div>
+      <div class="detail-section" id="deep-photo-instructions-section" style="display:none">
+        <div class="detail-section-title">📷 Fler foton rekommenderas</div>
+        <div class="photo-instructions" id="deep-photo-instructions"></div>
+      </div>
+      <div class="links-row" id="deep-links-row"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="modal-backdrop" id="settings-modal" onclick="closeSettings(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Inställningar</div>
+    <div class="input-group">
+      <label class="input-label">API-nyckel</label>
+      <input type="password" class="input" id="settings-apikey" placeholder="sk-ant-…" autocomplete="off">
+    </div>
+    <button class="btn btn-secondary btn-full" onclick="updateApiKey()">Spara ny nyckel</button>
+    <hr class="divider-line">
+    <button class="btn btn-ghost btn-full" onclick="clearAllData()">🗑 Rensa all data</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<canvas id="frame-canvas" style="display:none"></canvas>
+
+<script>
+// ════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════
+const S = {
+  apiKey: localStorage.getItem('lf_apikey') || '',
+  mode: 'video',
+  scanInterval: 1,
+  minValue: 0,
+  videoFile: null, videoUrl: null,
+  homePhotos: [],
+  findings: [],
+  currentFinding: null,
+  fromScreen: 'results',
+  deepPhotos: [],
+  scanning: false,
+  paused: false,
+  stopRequested: false,
+};
+
+window.addEventListener('load', () => showScreen(S.apiKey ? 'home' : 'apikey'));
+
+// ════════════════════════════════════════
+// NAV
+// ════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+// ════════════════════════════════════════
+// API KEY
+// ════════════════════════════════════════
+function saveApiKey() {
+  const v = document.getElementById('apikey-input').value.trim();
+  if (!v.startsWith('sk-ant')) { showErr('apikey-error', 'Bör börja med sk-ant-…'); return; }
+  S.apiKey = v; localStorage.setItem('lf_apikey', v);
+  hideErr('apikey-error'); showScreen('home');
+}
+document.getElementById('apikey-input').addEventListener('keydown', e => { if (e.key==='Enter') saveApiKey(); });
+
+function openSettings() { document.getElementById('settings-apikey').value = S.apiKey; document.getElementById('settings-modal').classList.add('open'); }
+function closeSettings(e) { if (e.target===document.getElementById('settings-modal')) document.getElementById('settings-modal').classList.remove('open'); }
+function updateApiKey() {
+  const v = document.getElementById('settings-apikey').value.trim();
+  if (v) { S.apiKey = v; localStorage.setItem('lf_apikey', v); toast('✓ Nyckel sparad'); }
+  document.getElementById('settings-modal').classList.remove('open');
+}
+function clearAllData() { if (confirm('Rensa API-nyckel och starta om?')) { localStorage.clear(); location.reload(); } }
+
+// ════════════════════════════════════════
+// MODE
+// ════════════════════════════════════════
+function setMode(m) {
+  S.mode = m;
+  document.getElementById('tab-video').classList.toggle('active', m==='video');
+  document.getElementById('tab-photo').classList.toggle('active', m==='photo');
+  document.getElementById('video-home-wrap').style.display = m==='video' ? 'flex' : 'none';
+  document.getElementById('photo-home-wrap').style.display = m==='photo' ? 'flex' : 'none';
+}
+
+function setInterval_(btn) { document.querySelectorAll('[data-interval]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); S.scanInterval = parseInt(btn.dataset.interval); }
+function setMinVal(btn) { document.querySelectorAll('[data-minval]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); S.minValue = parseInt(btn.dataset.minval); }
+function setMinVal2(btn) { document.querySelectorAll('[data-minval2]').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); S.minValue = parseInt(btn.dataset.minval2); }
+
+// ════════════════════════════════════════
+// VIDEO UPLOAD
+// ════════════════════════════════════════
+function triggerVideoUpload() { if (!S.videoFile) document.getElementById('video-input').click(); }
+function changeVideo(e) { e.stopPropagation(); document.getElementById('video-input').click(); }
+function handleVideoUpload(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  S.videoFile = f; S.videoUrl = URL.createObjectURL(f);
+  const p = document.getElementById('video-preview');
+  p.src = S.videoUrl; p.load();
+  document.getElementById('video-name-label').textContent = f.name;
+  document.getElementById('upload-zone').classList.add('loaded');
+  document.getElementById('start-scan-btn').disabled = false;
+  hideErr('home-video-error');
+}
+
+// ════════════════════════════════════════
+// PHOTO UPLOAD (home)
+// ════════════════════════════════════════
+function handlePhotoUpload(ev) {
+  const files = Array.from(ev.target.files).slice(0,10); if (!files.length) return;
+  S.homePhotos = [];
+  document.getElementById('photo-grid-home').innerHTML = '';
+  files.forEach(f => {
+    const r = new FileReader();
+    r.onload = e => {
+      S.homePhotos.push({ dataUrl: e.target.result, file: f });
+      const img = document.createElement('img'); img.className='photo-thumb-home'; img.src=e.target.result;
+      document.getElementById('photo-grid-home').appendChild(img);
+      document.getElementById('photo-count-label').textContent = S.homePhotos.length + ' foto' + (S.homePhotos.length>1?'n':'') + ' valda';
+      document.getElementById('start-photo-btn').disabled = false;
+    };
+    r.readAsDataURL(f);
+  });
+  document.getElementById('photo-preview-section').style.display = 'flex';
+  ev.target.value = '';
+}
+function clearPhotos() {
+  S.homePhotos = [];
+  document.getElementById('photo-grid-home').innerHTML = '';
+  document.getElementById('photo-preview-section').style.display = 'none';
+  document.getElementById('start-photo-btn').disabled = true;
+}
+
+// ════════════════════════════════════════
+// PHOTO SCAN (sequential, robust)
+// ════════════════════════════════════════
+async function startPhotoScan() {
+  if (!S.homePhotos.length) return;
+  if (!S.apiKey) { showErr('home-photo-error','API-nyckel saknas.'); return; }
+  S.findings = [];
+  showScreen('photo-scan');
+  const list = document.getElementById('photo-scan-list');
+  list.innerHTML = ''; hideErr('photo-scan-error');
+
+  for (let i=0; i<S.homePhotos.length; i++) {
+    const p = S.homePhotos[i];
+    const row = document.createElement('div'); row.className='photo-analyze-item';
+    row.innerHTML = `<img class="photo-analyze-thumb" src="${p.dataUrl}"><span class="photo-analyze-status">Foto ${i+1} / ${S.homePhotos.length}</span><span class="photo-analyze-badge" id="pb${i}">Analyserar…</span>`;
+    list.appendChild(row);
+    list.scrollTop = list.scrollHeight;
+
+    const badge = document.getElementById('pb'+i);
+    try {
+      const mime = p.dataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+      const b64  = p.dataUrl.split(',')[1];
+      const found = await callAnalyzeAPI(b64, mime);
+      let cnt = 0;
+      for (const item of found) {
+        if (item.estimatedValue >= S.minValue) {
+          S.findings.push({ ...item, frameDataUrl: p.dataUrl, id: Date.now()+Math.random() });
+          cnt++;
+        }
+      }
+      badge.textContent = cnt ? `${cnt} fynd` : 'Inga fynd';
+      badge.className = 'photo-analyze-badge done';
+    } catch(err) {
+      badge.textContent = 'Fel: ' + err.message.slice(0,30);
+      badge.className = 'photo-analyze-badge err';
+    }
+  }
+  await sleep(700);
+  showResults();
+}
+
+// ════════════════════════════════════════
+// VIDEO SCAN
+// ════════════════════════════════════════
+function startVideoScan() {
+  if (!S.videoFile || !S.apiKey) { showErr('home-video-error','API-nyckel saknas.'); return; }
+  S.findings = []; S.paused = false; S.stopRequested = false; S.scanning = true;
+
+  const vid = document.getElementById('scan-video');
+  vid.src = S.videoUrl; vid.load();
+
+  document.getElementById('scan-findings').innerHTML = `<div class="findings-header">Fynd hittills</div><div class="empty-state" id="scan-empty"><div class="empty-icon">👀</div><div class="empty-text">Letar efter föremål…</div></div>`;
+  document.getElementById('scan-count').textContent = '';
+  document.getElementById('pause-btn').textContent = '⏸ Pausa';
+  showScreen('scanning');
+  setScanDot('idle','Laddar video…');
+
+  vid.addEventListener('loadeddata', () => {
+    if (!vid.videoWidth || !vid.videoHeight) { setScanDot('error','Kunde inte läsa video.'); return; }
+    vid.play().then(() => { setScanDot('active','Scanning pågår'); startTimeUpdate(); runScanLoop(vid); })
+              .catch(e => setScanDot('error','Spela misslyckades: '+e.message));
+  }, { once: true });
+}
+
+async function runScanLoop(vid) {
+  while (S.scanning && !S.stopRequested) {
+    if (S.paused) { await sleep(200); continue; }
+    if (vid.ended) { finishScan(); return; }
+
+    await sleep(S.scanInterval * 1000);
+    if (S.paused || S.stopRequested || !S.scanning || vid.ended) continue;
+
+    const frame = captureFrame(vid);
+    if (!frame) continue;
+
+    setScanDot('active', `Analyserar ${formatTime(vid.currentTime)}…`);
+    try {
+      const items = await callAnalyzeAPI(frame.split(',')[1], 'image/jpeg');
+      let added = 0;
+      for (const item of items) {
+        if (item.estimatedValue >= S.minValue) {
+          const f = { ...item, frameDataUrl: frame, id: Date.now()+Math.random() };
+          S.findings.push(f); renderFindingCard(f, true); added++;
+        }
+      }
+      if (added) document.getElementById('scan-count').textContent = S.findings.length + ' fynd';
+      if (!S.paused) setScanDot('active','Scanning pågår');
+    } catch(err) {
+      setScanDot('error','API-fel: '+err.message.slice(0,50));
+      await sleep(2000);
+      if (!S.paused) setScanDot('active','Scanning pågår');
+    }
+  }
+  if (!S.stopRequested) finishScan();
+}
+
+function analyzeNow() {
+  const vid = document.getElementById('scan-video');
+  const wasPlaying = !vid.paused;
+  if (wasPlaying) vid.pause();
+  const frame = captureFrame(vid);
+  if (!frame) return;
+  setScanDot('active','Manuell analys…');
+  callAnalyzeAPI(frame.split(',')[1],'image/jpeg').then(items => {
+    for (const item of items) {
+      if (item.estimatedValue >= S.minValue) {
+        const f = { ...item, frameDataUrl: frame, id: Date.now()+Math.random() };
+        S.findings.push(f); renderFindingCard(f, true);
+        document.getElementById('scan-count').textContent = S.findings.length + ' fynd';
+      }
+    }
+    setScanDot('active','Scanning pågår');
+    if (wasPlaying && !S.paused) vid.play();
+  }).catch(e => setScanDot('error','Fel: '+e.message.slice(0,50)));
+}
+
+function togglePause() {
+  const vid = document.getElementById('scan-video');
+  S.paused = !S.paused;
+  const btn = document.getElementById('pause-btn');
+  if (S.paused) { vid.pause(); btn.textContent='▶ Fortsätt'; setScanDot('idle','Pausad'); }
+  else { vid.play(); btn.textContent='⏸ Pausa'; setScanDot('active','Scanning pågår'); }
+}
+
+function stopScan() {
+  if (S.findings.length > 0 && !confirm('Avbryt scan? Fynd hittills sparas.')) return;
+  S.stopRequested = true; S.scanning = false;
+  document.getElementById('scan-video').pause();
+  S.findings.length > 0 ? showResults() : showScreen('home');
+}
+
+function finishScan() {
+  S.scanning = false;
+  document.getElementById('scan-video').pause();
+  setScanDot('done','Klar! '+S.findings.length+' fynd hittade.');
+  setTimeout(() => S.findings.length > 0 ? showResults() : showScreen('home'), 900);
+}
+
+function startTimeUpdate() {
+  const vid = document.getElementById('scan-video');
+  const tEl = document.getElementById('scan-time');
+  const pEl = document.getElementById('scan-progress');
+  function tick() {
+    if (!S.scanning) return;
+    const cur = vid.currentTime, dur = vid.duration||1;
+    tEl.textContent = formatTime(cur)+' / '+formatTime(dur);
+    pEl.style.width = (cur/dur*100)+'%';
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function captureFrame(vid) {
+  if (!vid.videoWidth||!vid.videoHeight) return null;
+  const c = document.getElementById('frame-canvas');
+  const maxW = 1280, sc = Math.min(1, maxW/vid.videoWidth);
+  c.width = Math.round(vid.videoWidth*sc); c.height = Math.round(vid.videoHeight*sc);
+  c.getContext('2d').drawImage(vid,0,0,c.width,c.height);
+  return c.toDataURL('image/jpeg',0.82);
+}
+
+function setScanDot(type, text) {
+  document.getElementById('scan-dot').className = 'scan-dot'+(type==='active'?'':' '+type);
+  document.getElementById('scan-status-text').textContent = text;
+}
+
+// ════════════════════════════════════════
+// FINDING CARD
+// ════════════════════════════════════════
+function renderFindingCard(f, inScan) {
+  const el = inScan ? document.getElementById('scan-findings') : document.getElementById('results-list');
+  if (inScan) { const e=document.getElementById('scan-empty'); if(e) e.style.display='none'; }
+
+  const card = document.createElement('div'); card.className='finding-card';
+  card.onclick = () => openDetail(f, inScan?'scanning':'results');
+  card.innerHTML = `
+    <div class="finding-image-wrap">
+      <img src="${f.frameDataUrl}" alt="${f.name}">
+      <canvas class="finding-canvas" data-fid="${f.id}"></canvas>
+      <div class="finding-badge mono">${f.confidence}%</div>
+    </div>
+    <div class="finding-body">
+      <div class="finding-info">
+        <div class="finding-name">${f.name}</div>
+        <div class="finding-meta">
+          <span class="finding-price">~${f.estimatedValue.toLocaleString('sv-SE')} kr</span>
+          ${dots(f.confidence)}
+        </div>
+      </div>
+      <div class="finding-arrow">›</div>
+    </div>`;
+  el.appendChild(card);
+  const img=card.querySelector('img'), cvs=card.querySelector('canvas');
+  img.onload=()=>drawPoly(cvs,img,f.polygon||[]);
+  if(img.complete) drawPoly(cvs,img,f.polygon||[]);
+}
+
+function dots(pct) {
+  const n=Math.round(pct/20); let h='<div class="confidence-dots">';
+  for(let i=0;i<5;i++) h+=`<div class="confidence-dot${i<n?' filled':''}"></div>`;
+  return h+'</div>';
+}
+
+// ════════════════════════════════════════
+// POLYGON
+// ════════════════════════════════════════
+function drawPoly(cvs, img, poly) {
+  if(!poly||poly.length<3) return;
+  const w=img.offsetWidth, h=img.offsetHeight; if(!w||!h) return;
+  cvs.width=w; cvs.height=h;
+  const ctx=cvs.getContext('2d');
+  ctx.clearRect(0,0,w,h);
+  const pts=poly.map(p=>({x:p.x/100*w, y:p.y/100*h}));
+  ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y);
+  pts.slice(1).forEach(p=>ctx.lineTo(p.x,p.y)); ctx.closePath();
+  ctx.fillStyle='rgba(245,158,11,0.13)'; ctx.fill();
+  ctx.strokeStyle='#f59e0b'; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.stroke();
+  pts.forEach(p=>{ ctx.beginPath(); ctx.arc(p.x,p.y,4,0,Math.PI*2); ctx.fillStyle='#f59e0b'; ctx.fill(); });
+}
+
+window.addEventListener('resize', () => {
+  document.querySelectorAll('[data-fid]').forEach(cvs => {
+    const img=cvs.closest('.finding-image-wrap')?.querySelector('img');
+    const id=parseFloat(cvs.dataset.fid);
+    const f=S.findings.find(x=>x.id===id);
+    if(img&&f) drawPoly(cvs,img,f.polygon||[]);
+  });
+});
+
+// ════════════════════════════════════════
+// RESULTS
+// ════════════════════════════════════════
+function showResults() {
+  document.getElementById('results-list').innerHTML='';
+  const total=S.findings.reduce((s,f)=>s+(f.estimatedValue||0),0);
+  document.getElementById('results-total').textContent=total.toLocaleString('sv-SE')+' kr';
+  document.getElementById('results-title').textContent=S.findings.length+' fynd';
+  S.findings.forEach(f=>renderFindingCard(f,false));
+  showScreen('results');
+}
+
+// ════════════════════════════════════════
+// DETAIL
+// ════════════════════════════════════════
+function openDetail(f, from) {
+  S.currentFinding=f; S.fromScreen=from||'results';
+  document.getElementById('detail-topbar-title').textContent=f.name;
+  const instHtml=(f.photoInstructions||[]).map(i=>`<div class="photo-instruction"><span class="photo-instruction-icon">📷</span><span class="photo-instruction-text">${i}</span></div>`).join('');
+  const tq=encodeURIComponent(f.traderaQuery||f.name), bq=encodeURIComponent(f.blocketQuery||f.name);
+  document.getElementById('detail-content').innerHTML=`
+    <div class="detail-image-wrap">
+      <img id="d-img" src="${f.frameDataUrl}" alt="${f.name}">
+      <canvas class="detail-canvas" id="d-cvs"></canvas>
+    </div>
+    <div class="detail-body">
+      <div>
+        <div class="detail-name">${f.name}</div>
+        ${f.description?`<div class="detail-sub">${f.description}</div>`:''}
+      </div>
+      <div class="detail-price-row">
+        <div>
+          <div class="detail-price">~${f.estimatedValue.toLocaleString('sv-SE')} kr</div>
+          <div class="detail-price-label">Uppskattat värde</div>
+        </div>
+        <div class="detail-confidence">
+          <div class="detail-confidence-pct">${f.confidence}%</div>
+          <div class="detail-confidence-label">Säkerhet</div>
+        </div>
+      </div>
+      ${f.valueMotivation?`<div class="detail-section"><div class="detail-section-title">Varför detta värde</div><div class="detail-desc">${f.valueMotivation}</div></div>`:''}
+      ${instHtml?`<div class="detail-section"><div class="detail-section-title">📷 Fota detta</div><div class="photo-instructions">${instHtml}</div></div>`:''}
+      <div class="detail-section">
+        <div class="detail-section-title">Sök vidare</div>
+        <div class="links-row">
+          <a href="https://www.tradera.com/search?q=${tq}" target="_blank" rel="noopener" class="link-btn">🔗 Tradera</a>
+          <a href="https://www.blocket.se/annonser/hela_sverige?q=${bq}" target="_blank" rel="noopener" class="link-btn">🔗 Blocket</a>
+        </div>
+      </div>
+    </div>`;
+  const img=document.getElementById('d-img'), cvs=document.getElementById('d-cvs');
+  img.onload=()=>drawPoly(cvs,img,f.polygon||[]);
+  if(img.complete) drawPoly(cvs,img,f.polygon||[]);
+  showScreen('detail');
+}
+function goBackFromDetail() { showScreen(S.fromScreen); }
+
+// ════════════════════════════════════════
+// DEEP DIVE
+// ════════════════════════════════════════
+function goToDeepDive() {
+  S.deepPhotos=[];
+  document.getElementById('deep-photos-grid').innerHTML=`<div class="photo-add" onclick="document.getElementById('deep-file-input').click()"><span>＋</span><span class="photo-add-label">Lägg till</span></div>`;
+  document.getElementById('deep-analyze-btn').disabled=true;
+  document.getElementById('deep-result').classList.remove('visible');
+  document.getElementById('deep-loading').classList.remove('visible');
+  hideErr('deep-error');
+  const instr=S.currentFinding?.photoInstructions||[];
+  document.getElementById('deep-instructions-text').innerHTML=instr.length>0?instr.map(i=>`— ${i}`).join('<br>'):'Ladda upp närbild(er). Fota etikett, märkning, detaljer och baksida.';
+  showScreen('deep');
+}
+
+function addDeepPhotos(ev) {
+  Array.from(ev.target.files).forEach(f=>{
+    const r=new FileReader(); r.onload=e=>{
+      S.deepPhotos.push({dataUrl:e.target.result,file:f});
+      const g=document.getElementById('deep-photos-grid');
+      const img=document.createElement('img'); img.className='photo-thumb'; img.src=e.target.result;
+      g.insertBefore(img,g.lastElementChild);
+      document.getElementById('deep-analyze-btn').disabled=false;
+    }; r.readAsDataURL(f);
+  }); ev.target.value='';
+}
+
+function takePhoto() {
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.capture='environment';
+  inp.onchange=addDeepPhotos; inp.click();
+}
+
+async function runDeepAnalysis() {
+  if(!S.deepPhotos.length||!S.apiKey) return;
+  document.getElementById('deep-loading').classList.add('visible');
+  document.getElementById('deep-result').classList.remove('visible');
+  document.getElementById('deep-analyze-btn').disabled=true;
+  hideErr('deep-error');
+  try {
+    const r=await callDeepAPI(S.deepPhotos, S.currentFinding);
+    renderDeepResult(r);
+  } catch(e) { showErr('deep-error','Misslyckades: '+e.message); }
+  document.getElementById('deep-loading').classList.remove('visible');
+  document.getElementById('deep-analyze-btn').disabled=false;
+}
+
+function renderDeepResult(r) {
+  const rows=[
+    ['Föremål', r.name||S.currentFinding?.name],
+    r.brand?['Märke', r.brand]:null,
+    r.period?['Period', r.period]:null,
+    r.condition?['Skick', r.condition]:null,
+    ['Värdeintervall', `${(r.minValue||0).toLocaleString('sv-SE')} – ${(r.maxValue||0).toLocaleString('sv-SE')} kr`],
+    r.valueMotivation?['Motivering', r.valueMotivation]:null,
+  ].filter(Boolean);
+  document.getElementById('deep-result-card').innerHTML=rows.map((row,i)=>`<div class="result-row"><span class="result-key">${row[0]}</span><span class="result-val${i===4?' accent':''}">${row[1]}</span></div>`).join('');
+  const ip=document.getElementById('deep-photo-instructions'), is=document.getElementById('deep-photo-instructions-section');
+  if(r.photoInstructions?.length>0){
+    ip.innerHTML=r.photoInstructions.map(i=>`<div class="photo-instruction"><span class="photo-instruction-icon">📷</span><span class="photo-instruction-text">${i}</span></div>`).join('');
+    is.style.display='flex';
+  } else is.style.display='none';
+  const tq=encodeURIComponent(r.traderaQuery||r.name||''), bq=encodeURIComponent(r.blocketQuery||r.name||'');
+  document.getElementById('deep-links-row').innerHTML=`<a href="https://www.tradera.com/search?q=${tq}" target="_blank" rel="noopener" class="link-btn">🔗 Tradera</a><a href="https://www.blocket.se/annonser/hela_sverige?q=${bq}" target="_blank" rel="noopener" class="link-btn">🔗 Blocket</a>`;
+  document.getElementById('deep-result').classList.add('visible');
+}
+
+// ════════════════════════════════════════
+// API CALLS
+// ════════════════════════════════════════
+const PROMPT_SCAN = `Du är expert på antika föremål och loppisfynd i Sverige. Analysera bilden.
+
+Identifiera alla intressanta säljbara föremål. Returnera ENBART JSON (ingen text, inga kodblock):
+{"items":[{"name":"Namn på svenska","estimatedValue":850,"confidence":87,"description":"Kort beskrivning","valueMotivation":"Varför detta pris","polygon":[{"x":20,"y":30},{"x":45,"y":25},{"x":55,"y":28},{"x":60,"y":50},{"x":50,"y":65},{"x":25,"y":60}],"photoInstructions":["Fota botten för stämpel"],"traderaQuery":"sökord tradera","blocketQuery":"sökord blocket"}]}
+
+Regler: polygon 6-8 punkter x/y i % av bild. estimatedValue i SEK realistiskt andrahandspris. Inga föremål under 50kr. Inga föremål: {"items":[]}. ENBART JSON.`;
+
+const PROMPT_DEEP = (name, val, n) => `Du är expert på antika föremål i Sverige. Djupanalys av "${name}" (~${val}kr). Du har ${n} närbild(er).
+
+Returnera ENBART JSON:
+{"name":"Fullständigt namn","brand":"Märke eller null","period":"Period/årtal eller null","condition":"Nyskick/Mycket gott/Gott/Acceptabelt/Slitet","minValue":500,"maxValue":900,"valueMotivation":"Motivering","photoInstructions":["Instruktion om mer info behövs"],"traderaQuery":"söksträng","blocketQuery":"söksträng"}
+
+Realistiska svenska andrahandsmarknadsvärden. ENBART JSON.`;
+
+async function callAPI(body) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json','x-api-key':S.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(()=>({}));
+    throw new Error(e.error?.message || 'HTTP '+res.status);
+  }
+  const data = await res.json();
+  const txt = (data.content?.[0]?.text||'').replace(/```[a-z]*|```/g,'').trim();
+  // Extract JSON robustly
+  const s=txt.indexOf('{'), e=txt.lastIndexOf('}');
+  if(s===-1||e===-1) throw new Error('Inget JSON i svaret: '+txt.slice(0,100));
+  return JSON.parse(txt.slice(s,e+1));
+}
+
+async function callAnalyzeAPI(b64, mime) {
+  const data = await callAPI({
+    model:'claude-sonnet-4-20250514', max_tokens:1500,
+    messages:[{role:'user',content:[
+      {type:'image',source:{type:'base64',media_type:mime,data:b64}},
+      {type:'text',text:PROMPT_SCAN}
+    ]}]
+  });
+  return data.items || [];
+}
+
+async function callDeepAPI(photos, finding) {
+  const imgs = photos.map(p=>({type:'image',source:{type:'base64',media_type:p.dataUrl.split(';')[0].split(':')[1]||'image/jpeg',data:p.dataUrl.split(',')[1]}}));
+  return await callAPI({
+    model:'claude-sonnet-4-20250514', max_tokens:1000,
+    messages:[{role:'user',content:[...imgs,{type:'text',text:PROMPT_DEEP(finding?.name||'okänt',finding?.estimatedValue||0,photos.length)}]}]
+  });
+}
+
+// ════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════
+function formatTime(s) { if(!isFinite(s))return'0:00'; return `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`; }
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+function showErr(id,msg) { const e=document.getElementById(id); if(!e)return; e.textContent=msg; e.classList.add('visible'); }
+function hideErr(id) { document.getElementById(id)?.classList.remove('visible'); }
+function toast(msg,ms=2500) { const e=document.getElementById('toast'); e.textContent=msg; e.classList.add('show'); setTimeout(()=>e.classList.remove('show'),ms); }
+</script>
+</body>
+</html>
